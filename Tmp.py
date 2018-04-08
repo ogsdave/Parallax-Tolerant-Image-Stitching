@@ -7,32 +7,8 @@ import random
 from scipy.optimize import leastsq
 import scipy.misc
 import maxflow
+from ContentPreservingWarping import *
 from numpy import concatenate, ones, zeros
-
-def MATMUL(A, B):
-    rows_A = len(A)
-    cols_A = len(A[0])
-    rows_B = len(B)
-    cols_B = len(B[0])
-
-    if cols_A != rows_B:
-        print "Matrices are not compatible to Multiply. Check condition C1==R2"
-        return
-
-    # Create the result matrix
-    # Dimensions would be rows_A x cols_B
-    C = [[0 for row in range(cols_B)] for col in range(rows_A)]
-    #print C
-
-    for i in range(rows_A):
-        for j in range(cols_B):
-            for k in range(cols_A):
-                C[i][j] += A[i][k] * B[k][j]
-
-    C = np.matrix(C).reshape(len(A),len(B[0]))
-
-    return C
-
 
 def func1(param, coordinates):
     addition = param[0]*coordinates[0]-param[1]*coordinates[1]+param[2]
@@ -99,6 +75,8 @@ fnm2='./Folder'+str(i)+'/'+str(2)+'.jpg'
 img1 = cv2.imread(fnm1,0)          # queryImage
 img2 = cv2.imread(fnm2,0) 		   # trainImage
 # Initiate SIFT detector
+
+Size=np.asarray((np.asarray(img1)).shape)
 
 sift = cv2.xfeatures2d.SIFT_create()
 # find the keypoints and descriptors with SIFT
@@ -218,7 +196,8 @@ if len(good)>MIN_MATCH_COUNT:
             break
         if np.mean(penalty_score) >= 2:
             break
-    print H
+    Coefs=Find_Coef(best_H,feature_points_dst1,Size)
+    print Coefs
     
 
 else:

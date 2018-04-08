@@ -30,98 +30,87 @@ def MATMUL(A, B):
 
     return C
 
-def func1(param, coordinates):
-    addition = param[0]*coordinates[0]-param[1]*coordinates[1]+param[2]
-    return addition
+def Find_Coef(H,feature_pts,grid):
+	grid=[1280,720]
 
-def func2(param, coordinates):
-    addition = param[1]*coordinates[0]+param[0]*coordinates[1]+param[3]    
-    return addition
+	grid[0]=grid[0]/100
+	grid[1]=grid[1]/250
 
-def func(param,coordinates,coordinates1):
-    addition = np.sqrt((func1(param,coordinates)-coordinates1[0])**2+(func2(param,coordinates)-coordinates1[1])**2)
-    return addition
+	feature_pts=[[34,67,1],[100,303,1],[54,101,1]]
 
-i=1
-fnm1='./Folder'+str(i)+'/'+str(1)+'.jpg'
-fnm2='./Folder'+str(i)+'/'+str(2)+'.jpg'
+	# H=[[10,0.5,20],[0.8,2,50],[1.5,2,1]]
+	coef=[]
 
-img1 = cv2.imread(fnm1,0)          # queryImage
-img2 = cv2.imread(fnm2,0) 		   # trainImage
+	for pts in feature_pts:
+		Pts_Grid=np.asarray([[-1,-1,1],[-1,-1,1],[-1,-1,1],[-1,-1,1]])
 
-I=np.asarray(img1)
-I_=np.asarray(img2)
+		Pts_Grid[0][0]=(pts[0]/grid[0])*grid[0]
+		Pts_Grid[0][1]=(pts[1]/grid[1])*grid[1]
 
-grid=np.asarray(I.shape)
+		Pts_Grid[1][0]=(pts[0]/grid[0] + 1)*grid[0]
+		Pts_Grid[1][1]=(pts[1]/grid[1])*grid[1]
 
-grid[0]=grid[0]/100
-grid[1]=grid[1]/250
+		Pts_Grid[2][0]=(pts[0]/grid[0])*grid[0]
+		Pts_Grid[2][1]=(pts[1]/grid[1] + 1)*grid[1]
 
-feature_pts=[[34,67,1],[100,303,1],[54,101,1]]
-H=[[10,0.5,20],[0.8,2,50],[1.5,2,1]]
+		Pts_Grid[3][0]=(pts[0]/grid[0] + 1)*grid[0]
+		Pts_Grid[3][1]=(pts[1]/grid[1] + 1)*grid[1]
 
-for pts in feature_pts:
-	Pts_Grid=np.asarray([[-1,-1,1],[-1,-1,1],[-1,-1,1],[-1,-1,1]])
+		Pts_Grid=MATMUL(H,np.transpose(Pts_Grid))
 
-	Pts_Grid[0][0]=(pts[0]/grid[0])*grid[0]
-	Pts_Grid[0][1]=(pts[1]/grid[1])*grid[1]
+		Pts_Grid[0]=Pts_Grid[0]/Pts_Grid[2]
+		Pts_Grid[1]=Pts_Grid[1]/Pts_Grid[2]
+		Pts_Grid[2]=Pts_Grid[2]/Pts_Grid[2]
 
-	Pts_Grid[1][0]=(pts[0]/grid[0] + 1)*grid[0]
-	Pts_Grid[1][1]=(pts[1]/grid[1])*grid[1]
+		# print Pts_Grid
 
-	Pts_Grid[2][0]=(pts[0]/grid[0])*grid[0]
-	Pts_Grid[2][1]=(pts[1]/grid[1] + 1)*grid[1]
+		pts_=MATMUL(H,np.transpose([pts]))
 
-	Pts_Grid[3][0]=(pts[0]/grid[0] + 1)*grid[0]
-	Pts_Grid[3][1]=(pts[1]/grid[1] + 1)*grid[1]
+		x=pts_[0]/pts_[2]
+		y=pts_[1]/pts_[2]
 
-	Pts_Grid=MATMUL(H,np.transpose(Pts_Grid))
-	pts_=MATMUL(H,np.transpose([pts]))
+		Tmp=np.asarray([[1,-1,-1,1],[-1,1,0,0],[-1,0,1,0],[1,0,0,0]])
+		Pts_Grid=np.asarray(Pts_Grid[:-1][:])
 
-	x=pts_[0]
-	y=pts_[1]
+		# print Pts_Grid
+		
+		Alphabets=np.array(MATMUL(Tmp,np.transpose(Pts_Grid)))
 
-	Tmp=np.asarray([[1,-1,-1,1],[-1,1,0,0],[-1,0,1,0],[1,0,0,0]])
-	Pts_Grid=np.asarray(Pts_Grid[:-1][:])
+		a=Alphabets[0][0]
+		b=Alphabets[1][0]
+		c=Alphabets[2][0]
+		d=Alphabets[3][0]
+		e=Alphabets[0][1]
+		f=Alphabets[1][1]
+		g=Alphabets[2][1]
+		h=Alphabets[3][1]
 
-	# print Pts_Grid
-	
-	Alphabets=np.array(MATMUL(Tmp,np.transpose(Pts_Grid)))
+		# print Alphabets
 
-	a=Alphabets[0][0]
-	b=Alphabets[1][0]
-	c=Alphabets[2][0]
-	d=Alphabets[3][0]
-	e=Alphabets[0][1]
-	f=Alphabets[1][1]
-	g=Alphabets[2][1]
-	h=Alphabets[3][1]
+		A = a*f - b*e
+		B = e*x - a*y + a*h - d*e + c*f - b*g
+		C = g*x - c*y + c*h -d*g
 
-	# print Alphabets
+		D = a*g - c*e
+		E = e*x - a*y + a*h - d*e - c*f + b*g
+		F = f*x - b*y + b*h -d*f
 
-	A = a*f - b*e
-	B = e*x - a*y + a*h - d*e + c*f - b*g
-	C = g*x - c*y + c*h -d*g
+		# print A,B,C,D,E,F
 
-	D = a*g - c*e
-	E = e*x - a*y + a*h - d*e - c*f + b*g
-	F = f*x - b*y + b*h -d*f
+		u=np.array([-1.0,-1.0])
+		v=np.array([-1.0,-1.0])
 
-	# print A,B,C,D,E,F
+		if(A):
+			u[0]=(-B+np.sqrt(B*B-4*A*C))/(2*A)
+			u[1]=(-B-np.sqrt(B*B-4*A*C))/(2*A)
 
-	u=np.array([-1.0,-1.0])
-	v=np.array([-1.0,-1.0])
+			v[0]= (x - b*u[0] - d)/(a*u[0] +c)
+			v[1]= (x - b*u[1] - d)/(a*u[1] +c)
+		else:
+			u[0]=-C/B
 
-	if(A):
-		u[0]=(-B+np.sqrt(B*B-4*A*C))/(2*A)
-		u[1]=(-B-np.sqrt(B*B-4*A*C))/(2*A)
-
-		v[0]= (x - b*u[0] - d)/(a*u[0] +c)
-		v[1]= (x - b*u[1] - d)/(a*u[1] +c)
-	else:
-		u[0]=-C/B
-
-		v[0]= -F/E
-
-	coef=[(1-u[0])*(1-v[0]),(1-u[0])*(v[0]),(u[0])*(1-v[0]),(u[0])*(v[0])]
-	
+			v[0]= -F/E
+		
+		coef+=[[(1-u[0])*(1-v[0])*(grid[0]*grid[1]),(1-u[0])*(v[0])*(grid[0]*grid[1]),(u[0])*(1-v[0])*(grid[0]*grid[1]),(u[0])*(v[0])*(grid[0]*grid[1])]]
+		# coef[1]=[(1-u[1])*(1-v[1])*(grid[0]*grid[1]),(1-u[1])*(v[1])*(grid[0]*grid[1]),(u[1])*(1-v[1])*(grid[0]*grid[1]),(u[1])*(v[1])*(grid[0]*grid[1])]
+	return coef
