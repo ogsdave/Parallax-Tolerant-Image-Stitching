@@ -161,6 +161,8 @@ if len(good)>MIN_MATCH_COUNT:
             feature_points_dst.append(dst_pts[dist_list[i][0]])
             feature_points_src1 = np.float32(feature_points_src)
             feature_points_dst1 = np.float32(feature_points_dst)
+            feature_points_src1[:, :, 0], feature_points_src1[:, :, 1] = feature_points_src1[:, :, 1], feature_points_src1[:, :, 0].copy()
+            feature_points_dst1[:, :, 0], feature_points_dst1[:, :, 1] = feature_points_dst1[:, :, 1], feature_points_dst1[:, :, 0].copy()
             H, mask = cv2.findHomography(feature_points_src1, feature_points_dst1, cv2.RANSAC,5.0)
             i+=1
             h,w = np.shape(img1)
@@ -193,9 +195,13 @@ if len(good)>MIN_MATCH_COUNT:
             best_alignment_so_far = align_quality
             best_H = H
         if align_quality < 100:
+            best_H = H
             break
         if np.mean(penalty_score) >= 2:
+            best_H = H
             break
+    (x,y,z) = np.shape(feature_points_dst1)
+    feature_points_dst1 =  feature_points_dst1.reshape(x,z)
     Coefs=Find_Coef(best_H,feature_points_dst1,Size)
     print Coefs
     
