@@ -1,9 +1,12 @@
 import numpy as np
 import cv2
 import math
+import itertools
 from matplotlib import pyplot as plt
 import random
 from scipy.optimize import leastsq
+from scipy.optimize import minimize
+from quadprog import solve_qp
 import scipy.misc
 import maxflow
 from ContentPreservingWarping import *
@@ -28,14 +31,12 @@ def func(param,coordinates,coordinates1):
     addition = np.sqrt((func1(param,coordinates)-coordinates1[0])**2+(func2(param,coordinates)-coordinates1[1])**2)
     return addition
 
-def Algfunc(X,feature_points,Dst_Points,Coefs,sz):
-    Ep=0
+def Align_func(X,feature_points,Dst_Points,Coefs,sz):
+
     Ep,T=Local_alignment(X,feature_points,Dst_Points,Coefs,sz)
-    Ep=Ep.flatten()
-    # T=np.ones([sz[0],sz[1]])
     Eg=Global_alignment(X,T,sz)
-    Eg=Eg.flatten()
-    E=(Ep+Eg*0.01)
+    Es=Smooth_alignment(V,1,feature_points,sz)
+    E = (Ep + Eg*0.01 + Es*0.001)
     return E
 
 def gaussian(x, mu, sig):
@@ -83,11 +84,17 @@ def graph_cut(I,src_pts):
     return x
 
 def Local_alignment(V,feature_points,Dst_Points,Coefs,sz):
-    Ep=np.zeros([sz[0],sz[1],2])
     T=np.zeros([sz[0],sz[1]])
+    Ep=0
+
     for i in xrange(len(feature_points)):
-        a,b=int(round(feature_points[i][0])),int(round(feature_points[i][1]))
+        a,b=int(feature_points[i][0]),int(feature_points[i][1])
+
         T[a][b]=1
+        T[a+1][b]=1
+        T[a][b+1]=1
+        T[a+1][b+1]=1
+
         tmpx=0
         tmpy=0
         for j in xrange(len(Dst_Points[i])):
@@ -104,20 +111,46 @@ def Local_alignment(V,feature_points,Dst_Points,Coefs,sz):
 
         tmpx-=feature_points[i][0]
         tmpy-=feature_points[i][1]
-        Ep[a][b][1]=tmpy*tmpy
-        Ep[a][b][0]=tmpx*tmpx
+
+        Ep += tmpy*tmpy + tmpx*tmpx
+
     return Ep,T
 
 def Global_alignment(V,T,sz):
-    Eg=np.zeros([sz[0],sz[1],2])
+	Eg=0
     for i in xrange(sz[0]):
         for j in xrange(sz[1]):
             Idx0 = ravel_index((i, j, 0), sz)
             Idx1 = ravel_index((i, j, 1), sz)
             # print i,j,Idx0,Idx1
-            Eg[i][j][0]=T[i][j]*(V[Idx0]-i)*(V[Idx0]-i)
-            Eg[i][j][1]=T[i][j]*(V[Idx1]-j)*(V[Idx1]-j)
+            Eg += T[i][j]*( (V[Idx0]-i)*(V[Idx0]-i) + (V[Idx1]-j)*(V[Idx1]-j) )
     return Eg
+
+def Smooth_alignment(V,ws,feature_points,sz):
+	Es=0
+    for i in range(0,len(feature_points)):
+    	for j in range(i,len(feature_points)):
+        	for k in range(j,len(feature_points)):
+        		a1,b1=int(feature_points[i][0]),int(feature_points[i][1])
+        		a2,b2=int(feature_points[j][0]),int(feature_points[j][1])
+        		a3,b3=int(feature_points[k][0]),int(feature_points[k][1])
+
+	            Idx0 = ravel_index((a1, b1, 0), sz)
+	            Idx1 = ravel_index((a2, b2, 0), sz)
+	            Idx2 = ravel_index((a3, b3, 0), sz)
+
+	            Idy0 = ravel_index((a1, b1, 1), sz)
+	            Idy1 = ravel_index((a2, b2, 1), sz)
+	            Idy2 = ravel_index((a3, b3, 1), sz)
+
+	            u=float((a1-a2)*(a3-a2)+(b1-b2)*(b3-b2))/float((a3-a2)*(a3-a2)+(b3-b2)*(b3-b2))
+	            v=float((a1-a2)-u*(a3-a2))/float(b3-b2)
+
+	            tmpx = V(Idx0) - ( V(Idx1) + u*(V(Idx2)-V(Idx1)) + v*(V(Idy2)-V(Idy1)) )
+	            tmpy = V(Idy0) - ( V(Idy1) + u*(V(Idy2)-V(Idy1)) - v*(V(Idx2)-V(Idx1)) )
+
+	            Es += ws*(tmpx*tmpx + tmpy*tmpy)
+    return Es
 
 i=1
 MIN_MATCH_COUNT = 10
@@ -272,8 +305,17 @@ if len(good)>MIN_MATCH_COUNT:
     for i in xrange(x):
         feature_points+=[feature_points_src1[i].tolist()]
 
-    print "res",np.atleast_1d(Algfunc(*((param_init[:h*w*2],) + (feature_points,Dst_Points,Coefs,sz))))
-    params, success = leastsq(Algfunc,param_init,args=(feature_points,Dst_Points,Coefs,sz))
+    Bh=(0.0,float(h))
+    Bw=(0.0,float(w))
+    Bnds=[]
+    for i in xrange(h*w):
+    		Bnds+=[Bh]
+    		Bnds+=[Bw]
+
+    Bnds=tuple(Bnds)
+    print Bnds
+    Sol = minimize(Align_func,param_init,method='SLSQP',bounds=Bnds)
+    print Sol
         
 else:
     print "Not enough matches are found - %d/%d" % (len(good),MIN_MATCH_COUNT)
